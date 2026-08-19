@@ -28,6 +28,9 @@ Route::middleware('auth')->group(function () {
     // Servers Management
     Route::get('/servers', [ServerController::class, 'index'])->name('servers.index');
     Route::post('/servers', [ServerController::class, 'store'])->name('servers.store');
+    Route::put('/servers/{server}', [ServerController::class, 'update'])->name('servers.update');
+    Route::post('/servers/{server}/regenerate-token', [ServerController::class, 'regenerateToken'])->name('servers.regenerate_token');
+    Route::delete('/servers/{server}', [ServerController::class, 'destroy'])->name('servers.destroy');
 
     // Repositories Management
     Route::get('/repositories', [RepositoryController::class, 'index'])->name('repositories.index');
