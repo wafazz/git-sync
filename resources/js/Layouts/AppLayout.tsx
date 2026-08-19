@@ -60,7 +60,7 @@ export default function AppLayout({ title, breadcrumbs, children }: PropsWithChi
 
         <div className="sidebar-nav overflow-y-auto">
           <div className="sidebar-section-header">Core Overview</div>
-          <Link href="/dashboard" className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}>
+          <Link href="/dashboard" className={`nav-link nav-link-dashboard ${isActive('/dashboard') ? 'active' : ''}`}>
             <Activity size={18} />
             <span>Dashboard</span>
           </Link>
