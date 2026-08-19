@@ -188,9 +188,9 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
 
     switch ($verb) {
         case 'git_fetch':
-            return "if [ ! -d .git ]; then git clone -b {$branch} {$repoUrl} . ; else git remote set-url origin {$repoUrl} && git fetch --prune origin ; fi";
+            return "GIT_TERMINAL_PROMPT=0 if [ ! -d .git ]; then git clone -b {$branch} {$repoUrl} . ; else git remote set-url origin {$repoUrl} && git fetch --prune origin ; fi";
         case 'git_checkout':
-            return "git checkout {$branch} && git pull origin {$branch}";
+            return "GIT_TERMINAL_PROMPT=0 git checkout {$branch} && git pull origin {$branch}";
         case 'git_reset':
             return ($job['commit_sha'] !== 'HEAD' && ! empty($job['commit_sha']))
                 ? "git reset --hard {$commit}"

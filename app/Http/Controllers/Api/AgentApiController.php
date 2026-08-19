@@ -131,9 +131,9 @@ class AgentApiController extends Controller
         $repo = $job->project->repository;
         $repoUrl = $repo->repo_url;
 
-        // If repository has stored PAT credential, inject token for private repo operations
-        if ($repo->credential && ! empty($repo->credential->encrypted_payload) && $repo->auth_type === 'pat') {
-            $token = $repo->credential->encrypted_payload;
+        // If repository has stored PAT credential, inject decrypted token for private repo operations
+        if ($repo->credential && ! empty($repo->credential->decrypted_payload) && $repo->auth_type === 'pat') {
+            $token = $repo->credential->decrypted_payload;
             if (str_starts_with($repoUrl, 'https://') && ! str_contains($repoUrl, '@')) {
                 $parsed = parse_url($repoUrl);
                 $host = $parsed['host'] ?? 'github.com';
