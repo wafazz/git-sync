@@ -208,7 +208,13 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
         case 'artisan_optimize':
             return 'php artisan optimize';
         case 'queue_restart':
-            return 'php artisan queue:restart || true';
+            return 'php artisan queue:restart || pm2 restart all || true';
+        case 'docker_compose_up':
+            return 'docker compose up -d --build || docker-compose up -d --build';
+        case 'pip_install':
+            return 'if [ -f requirements.txt ]; then pip3 install -r requirements.txt || pip install -r requirements.txt ; else echo "[SKIP] No requirements.txt found." ; fi';
+        case 'artisan_cache_clear':
+            return 'php artisan optimize:clear';
         case 'health_check':
             return "echo '[HEALTH] Endpoint verified.'";
         default:

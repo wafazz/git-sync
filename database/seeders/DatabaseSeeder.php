@@ -80,75 +80,163 @@ class DatabaseSeeder extends Seeder
         GitProvider::firstOrCreate(['name' => 'Gitea'], ['provider_type' => 'gitea', 'base_url' => 'https://gitea.io']);
         GitProvider::firstOrCreate(['name' => 'Custom Git Server'], ['provider_type' => 'custom_git', 'base_url' => '']);
 
-        // 5. Seed Deployment Profiles
-        $p1 = DeploymentProfile::firstOrCreate(
-            ['name' => 'Laravel 12 Standard (Testing)'],
-            ['framework' => 'laravel12', 'description' => 'Full automated test deployment pipeline with migrations and asset build']
-        );
-        $steps1 = [
-            ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
-            ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
-            ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
-            ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
-            ['step_order' => 5, 'action_verb' => 'npm_install', 'timeout_seconds' => 300],
-            ['step_order' => 6, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
-            ['step_order' => 7, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 180],
-            ['step_order' => 8, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
-            ['step_order' => 9, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+        // 5. Seed Comprehensive Deployment Profiles Library
+        $profilesData = [
+            [
+                'name' => 'Laravel 12 Standard (Testing / QA)',
+                'framework' => 'laravel12',
+                'description' => 'Full automated test pipeline with composer update, npm build, migrations, and health check',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'npm_install', 'timeout_seconds' => 300],
+                    ['step_order' => 6, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
+                    ['step_order' => 7, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 180],
+                    ['step_order' => 8, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
+                    ['step_order' => 9, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Laravel 12 Production Zero-Downtime',
+                'framework' => 'laravel12',
+                'description' => 'Production hardened pipeline with queue worker reboot, forced migrations, and health verification',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
+                    ['step_order' => 4, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 300],
+                    ['step_order' => 6, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
+                    ['step_order' => 7, 'action_verb' => 'queue_restart', 'timeout_seconds' => 60],
+                    ['step_order' => 8, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Laravel Blade & Backend (No NPM/Node)',
+                'framework' => 'laravel_blade',
+                'description' => 'Lightweight PHP & Blade pipeline without Node.js or NPM build dependencies',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 180],
+                    ['step_order' => 6, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
+                    ['step_order' => 7, 'action_verb' => 'queue_restart', 'timeout_seconds' => 60],
+                    ['step_order' => 8, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Laravel Headless API & Microservices',
+                'framework' => 'laravel_api',
+                'description' => 'Backend API service with fast caching, queue reboot, and health verification',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 180],
+                    ['step_order' => 6, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
+                    ['step_order' => 7, 'action_verb' => 'queue_restart', 'timeout_seconds' => 60],
+                    ['step_order' => 8, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'React / Vue / Vite Frontend SPA',
+                'framework' => 'frontend_spa',
+                'description' => 'Node/NPM compilation and static asset distribution for Vite, React, and Vue applications',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'npm_install', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
+                    ['step_order' => 6, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Next.js / Nuxt Full-Stack SSR',
+                'framework' => 'node_ssr',
+                'description' => 'Server-rendered React/Vue with build step and PM2 process reload',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'npm_install', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
+                    ['step_order' => 6, 'action_verb' => 'queue_restart', 'timeout_seconds' => 60],
+                    ['step_order' => 7, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Static HTML / Hugo / Astro / Docs Site',
+                'framework' => 'static_web',
+                'description' => 'Zero-dependency instant git sync for static HTML, Astro, Hugo, or landing pages',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'PHP Generic / WordPress / Symfony App',
+                'framework' => 'php_generic',
+                'description' => 'Generic PHP application synchronization with composer autoload optimization',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Docker Compose Automated Service',
+                'framework' => 'docker',
+                'description' => 'Containerized microservice synchronization with automated compose rebuild',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'docker_compose_up', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
+            [
+                'name' => 'Python FastAPI / Django / Flask Backend',
+                'framework' => 'python',
+                'description' => 'Python backend synchronization with requirements install and service restart',
+                'steps' => [
+                    ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
+                    ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
+                    ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
+                    ['step_order' => 4, 'action_verb' => 'pip_install', 'timeout_seconds' => 300],
+                    ['step_order' => 5, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
+                ],
+            ],
         ];
-        foreach ($steps1 as $st) {
-            DeploymentProfileStep::firstOrCreate(['profile_id' => $p1->id, 'step_order' => $st['step_order']], $st);
-        }
 
-        $p2 = DeploymentProfile::firstOrCreate(
-            ['name' => 'Laravel 12 Production Zero-Downtime'],
-            ['framework' => 'laravel12', 'description' => 'Production hardened pipeline with queue restart and health verification']
-        );
-        $steps2 = [
-            ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
-            ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
-            ['step_order' => 3, 'action_verb' => 'composer_update', 'timeout_seconds' => 300, 'parameters' => ['no_dev' => true]],
-            ['step_order' => 4, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
-            ['step_order' => 5, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 300, 'parameters' => ['force' => true]],
-            ['step_order' => 6, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
-            ['step_order' => 7, 'action_verb' => 'queue_restart', 'timeout_seconds' => 60],
-            ['step_order' => 8, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
-        ];
-        foreach ($steps2 as $st) {
-            DeploymentProfileStep::firstOrCreate(['profile_id' => $p2->id, 'step_order' => $st['step_order']], $st);
-        }
+        foreach ($profilesData as $pData) {
+            $profile = DeploymentProfile::firstOrCreate(
+                ['name' => $pData['name']],
+                [
+                    'framework' => $pData['framework'],
+                    'description' => $pData['description'],
+                ]
+            );
 
-        $p3 = DeploymentProfile::firstOrCreate(
-            ['name' => 'React / Node.js SPA'],
-            ['framework' => 'react_spa', 'description' => 'Frontend bundle build and distribution']
-        );
-        $steps3 = [
-            ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
-            ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
-            ['step_order' => 3, 'action_verb' => 'npm_install', 'timeout_seconds' => 300],
-            ['step_order' => 4, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
-            ['step_order' => 5, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
-        ];
-        foreach ($steps3 as $st) {
-            DeploymentProfileStep::firstOrCreate(['profile_id' => $p3->id, 'step_order' => $st['step_order']], $st);
-        }
-
-        $p4 = DeploymentProfile::firstOrCreate(
-            ['name' => 'Laravel Blade & Backend (No NPM/Node)'],
-            ['framework' => 'laravel_blade', 'description' => 'Lightweight PHP & Blade pipeline without Node.js or NPM build steps']
-        );
-        $steps4 = [
-            ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
-            ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
-            ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
-            ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
-            ['step_order' => 5, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 180],
-            ['step_order' => 6, 'action_verb' => 'artisan_optimize', 'timeout_seconds' => 60],
-            ['step_order' => 7, 'action_verb' => 'queue_restart', 'timeout_seconds' => 60],
-            ['step_order' => 8, 'action_verb' => 'health_check', 'timeout_seconds' => 30],
-        ];
-        foreach ($steps4 as $st) {
-            DeploymentProfileStep::firstOrCreate(['profile_id' => $p4->id, 'step_order' => $st['step_order']], $st);
+            foreach ($pData['steps'] as $st) {
+                DeploymentProfileStep::firstOrCreate(
+                    [
+                        'profile_id' => $profile->id,
+                        'step_order' => $st['step_order'],
+                    ],
+                    $st
+                );
+            }
         }
     }
 }

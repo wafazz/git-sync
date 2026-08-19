@@ -47,6 +47,8 @@ Route::middleware('auth')->group(function () {
 
     // Deployment Profiles
     Route::get('/profiles', [ProfileController::class, 'index'])->name('profiles.index');
+    Route::post('/profiles', [ProfileController::class, 'store'])->name('profiles.store');
+    Route::delete('/profiles/{profile}', [ProfileController::class, 'destroy'])->name('profiles.destroy');
 
     // Deployments History & Live Console
     Route::get('/deployments', [DeploymentController::class, 'index'])->name('deployments.index');
