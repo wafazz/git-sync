@@ -34,19 +34,24 @@ echo "========================================================"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-echo "Downloading agent.php..."
+echo "Downloading latest agent.php..."
 curl -sSL "https://raw.githubusercontent.com/wafazz/git-sync/main/agent/agent.php" -o "$INSTALL_DIR/agent.php"
 
 echo "Registering agent with ${MANAGER_URL}..."
 php "$INSTALL_DIR/agent.php" --url="$MANAGER_URL" --token="$AGENT_TOKEN"
 
+# Kill any previous agent process if running
+pkill -f "agent.php --daemon" || true
+
+# Start background daemon
+nohup php "$INSTALL_DIR/agent.php" --url="$MANAGER_URL" --daemon > "$INSTALL_DIR/agent.log" 2>&1 &
+
 echo ""
 echo "========================================================"
-echo "  Agent Installed & Registered Successfully!            "
+echo "  Agent Installed, Registered & Daemon Started!         "
 echo "========================================================"
+echo "Process PID : $!"
+echo "Log File    : $INSTALL_DIR/agent.log"
 echo ""
-echo "To run the agent in background:"
-echo "  nohup php $INSTALL_DIR/agent.php --daemon > $INSTALL_DIR/agent.log 2>&1 &"
-echo ""
-echo "Or run manually:"
-echo "  php $INSTALL_DIR/agent.php --daemon"
+echo "Check live daemon output with:"
+echo "  tail -f $INSTALL_DIR/agent.log"

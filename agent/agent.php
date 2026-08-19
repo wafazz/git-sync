@@ -6,8 +6,15 @@
  * Lightweight, zero-dependency deployment agent for Linux, macOS, Windows/WSL.
  * Executes ONLY allowlisted parameterized operations in sandboxed project workspaces.
  */
-$options = getopt('', ['url:', 'token:', 'daemon', 'interval:']);
-$serverUrl = rtrim($options['url'] ?? getenv('CS_MANAGER_URL') ?: 'http://127.0.0.1:8000', '/');
+$options = getopt('', ['url:', 'token:', 'daemon', 'interval:', 'verbose']);
+$configFile = __DIR__.'/agent_config.json';
+$config = [];
+
+if (file_exists($configFile)) {
+    $config = json_decode(file_get_contents($configFile), true) ?: [];
+}
+
+$serverUrl = rtrim($options['url'] ?? getenv('CS_MANAGER_URL') ?: ($config['server_url'] ?? 'http://127.0.0.1:8000'), '/');
 $token = $options['token'] ?? getenv('CS_AGENT_TOKEN') ?: '';
 $interval = (int) ($options['interval'] ?? 5);
 
@@ -15,13 +22,6 @@ echo "========================================================\n";
 echo "  CoreSentinel Git Deployment Agent (CS-GDS v1.1.0)     \n";
 echo "========================================================\n";
 echo "Manager URL : {$serverUrl}\n";
-
-$configFile = __DIR__.'/agent_config.json';
-$config = [];
-
-if (file_exists($configFile)) {
-    $config = json_decode(file_get_contents($configFile), true) ?: [];
-}
 
 // 1. Handshake & Registration if not yet registered
 if (empty($config['agent_uuid']) || empty($config['secret'])) {
@@ -53,7 +53,12 @@ if (empty($config['agent_uuid']) || empty($config['secret'])) {
     file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT));
     echo "[AGENT] Successfully registered as [{$config['server_name']}] ({$config['environment']}).\n";
 } else {
-    echo "[AGENT] Loaded existing credentials for Agent UUID: {$config['agent_uuid']}\n";
+    // Save updated serverUrl into config if explicitly provided
+    if (! empty($options['url']) && $options['url'] !== ($config['server_url'] ?? '')) {
+        $config['server_url'] = $serverUrl;
+        file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT));
+    }
+    echo "[AGENT] Loaded credentials for Agent: [{$config['server_name']}] (UUID: {$config['agent_uuid']})\n";
 }
 
 $agentUuid = $config['agent_uuid'];
@@ -62,7 +67,9 @@ $headers = [
     'Content-Type: application/json',
 ];
 
-echo "[AGENT] Agent daemon active. Polling for deployment tasks every {$interval}s...\n";
+echo "[AGENT] Daemon active. Heartbeat and job polling running every {$interval}s...\n";
+
+$failCount = 0;
 
 while (true) {
     // 2. Heartbeat Ping
@@ -73,11 +80,24 @@ while (true) {
         'version' => '1.1.0',
     ], $headers);
 
-    if ($hb && ! empty($hb['has_pending_jobs'])) {
-        // 3. Poll for assigned deployment job
-        $jobRes = httpGet("{$serverUrl}/api/v1/agent/jobs/poll", $headers);
-        if (! empty($jobRes['job'])) {
-            executeDeploymentJob($serverUrl, $headers, $jobRes['job']);
+    if (! $hb) {
+        $failCount++;
+        if ($failCount <= 3 || $failCount % 12 === 0) {
+            echo "[WARNING] Unable to reach Manager at {$serverUrl}/api/v1/agent/heartbeat (Attempt {$failCount})\n";
+        }
+    } else {
+        if ($failCount > 0) {
+            echo "[AGENT] Reconnected to Manager successfully!\n";
+            $failCount = 0;
+        }
+
+        if (! empty($hb['has_pending_jobs'])) {
+            echo "[AGENT] Pending deployment job detected! Polling job details...\n";
+            // 3. Poll for assigned deployment job
+            $jobRes = httpGet("{$serverUrl}/api/v1/agent/jobs/poll", $headers);
+            if (! empty($jobRes['job'])) {
+                executeDeploymentJob($serverUrl, $headers, $jobRes['job']);
+            }
         }
     }
 
@@ -93,10 +113,10 @@ function executeDeploymentJob(string $serverUrl, array $headers, array $job)
     $deployId = $job['id'];
     $deployPath = $job['deploy_path'];
 
-    echo "\n--------------------------------------------------------\n";
-    echo "[JOB #{$deployId}] Received Deployment for [{$job['project_name']}]\n";
+    echo "\n========================================================\n";
+    echo "[JOB #{$deployId}] STARTING DEPLOYMENT FOR [{$job['project_name']}]\n";
     echo "Branch: {$job['branch']} | Target Path: {$deployPath}\n";
-    echo "--------------------------------------------------------\n";
+    echo "========================================================\n";
 
     // ACK Start
     httpPost("{$serverUrl}/api/v1/agent/deployments/{$deployId}/ack", [], $headers);
@@ -113,17 +133,20 @@ function executeDeploymentJob(string $serverUrl, array $headers, array $job)
         $stepId = $step['id'];
         $verb = $step['verb'];
 
-        echo ">>> Executing Step: {$verb}...\n";
+        echo "\n>>> [Step {$step['order']}] Executing: {$verb}...\n";
         streamLog($serverUrl, $headers, $deployId, $stepId, 'system', "--> Starting step [{$verb}]");
 
         $command = buildAllowlistedCommand($verb, $job);
         if (! $command) {
-            streamLog($serverUrl, $headers, $deployId, $stepId, 'stderr', "Action [{$verb}] rejected by agent security policy.");
+            $msg = "Action [{$verb}] rejected by agent security allowlist.";
+            echo "[ERROR] {$msg}\n";
+            streamLog($serverUrl, $headers, $deployId, $stepId, 'stderr', $msg);
             $overallSuccess = false;
             $errorSummary = "Disallowed action verb: {$verb}";
             break;
         }
 
+        echo "Running: {$command}\n";
         $exitCode = runAndStreamProcess($command, $deployPath, function ($stream, $chunk) use ($serverUrl, $headers, $deployId, $stepId) {
             echo $chunk;
             streamLog($serverUrl, $headers, $deployId, $stepId, $stream, $chunk);
@@ -131,10 +154,14 @@ function executeDeploymentJob(string $serverUrl, array $headers, array $job)
 
         if ($exitCode !== 0) {
             $overallSuccess = false;
-            $errorSummary = "Step [{$verb}] exited with code {$exitCode}";
+            $errorSummary = "Step [{$verb}] exited with error code {$exitCode}";
+            echo "\n[FAILED] {$errorSummary}\n";
             streamLog($serverUrl, $headers, $deployId, $stepId, 'stderr', "FAILED: {$errorSummary}");
             break;
         }
+
+        echo "[OK] Step {$verb} completed.\n";
+        streamLog($serverUrl, $headers, $deployId, $stepId, 'system', "<-- Completed step [{$verb}] successfully.");
     }
 
     $duration = time() - $startTime;
@@ -147,21 +174,26 @@ function executeDeploymentJob(string $serverUrl, array $headers, array $job)
         'error_summary' => $errorSummary,
     ], $headers);
 
-    echo "[JOB #{$deployId}] Execution Finished: {$finalStatus} ({$duration}s)\n";
+    echo "\n========================================================\n";
+    echo "[JOB #{$deployId}] FINISHED: Status={$finalStatus} (Duration: {$duration}s)\n";
+    echo "========================================================\n\n";
 }
 
 function buildAllowlistedCommand(string $verb, array $job): ?string
 {
     $branch = escapeshellarg($job['branch']);
     $commit = escapeshellarg($job['commit_sha']);
+    $repoUrl = escapeshellarg($job['repo_url']);
 
     switch ($verb) {
         case 'git_fetch':
-            return 'git fetch --prune origin';
+            return "if [ ! -d .git ]; then git clone -b {$branch} {$repoUrl} . ; else git fetch --prune origin ; fi";
         case 'git_checkout':
-            return "git checkout {$branch}";
+            return "git checkout {$branch} && git pull origin {$branch}";
         case 'git_reset':
-            return $job['commit_sha'] !== 'HEAD' ? "git reset --hard {$commit}" : "git reset --hard origin/{$job['branch']}";
+            return ($job['commit_sha'] !== 'HEAD' && ! empty($job['commit_sha']))
+                ? "git reset --hard {$commit}"
+                : "git reset --hard origin/{$job['branch']}";
         case 'composer_install':
             return 'composer install --no-interaction --prefer-dist --optimize-autoloader';
         case 'npm_install':
@@ -173,11 +205,11 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
         case 'artisan_optimize':
             return 'php artisan optimize';
         case 'queue_restart':
-            return 'php artisan queue:restart';
+            return 'php artisan queue:restart || true';
         case 'health_check':
             return "echo '[HEALTH] Endpoint verified.'";
         default:
-            return null; // Reject all unknown commands
+            return null; // Reject all non-allowlisted verbs
     }
 }
 
