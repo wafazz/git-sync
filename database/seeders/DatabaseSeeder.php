@@ -20,24 +20,24 @@ class DatabaseSeeder extends Seeder
     {
         // 1. Seed RBAC Permissions
         $permissions = [
-            ['name' => 'view_dashboard', 'guard_name' => 'web', 'description' => 'View system metrics and pipeline status'],
-            ['name' => 'manage_servers', 'guard_name' => 'web', 'description' => 'Register, edit and decommission target servers'],
-            ['name' => 'view_servers', 'guard_name' => 'web', 'description' => 'View connected server nodes and heartbeats'],
-            ['name' => 'manage_repositories', 'guard_name' => 'web', 'description' => 'Register and configure Git repositories and credentials'],
-            ['name' => 'view_repositories', 'guard_name' => 'web', 'description' => 'View connected Git repositories'],
-            ['name' => 'manage_projects', 'guard_name' => 'web', 'description' => 'Configure environment project bindings and rules'],
-            ['name' => 'view_projects', 'guard_name' => 'web', 'description' => 'View project mappings and deployment paths'],
-            ['name' => 'trigger_deploy_development', 'guard_name' => 'web', 'description' => 'Trigger deployments targeting development nodes'],
-            ['name' => 'trigger_deploy_testing', 'guard_name' => 'web', 'description' => 'Trigger deployments targeting testing/qa nodes'],
-            ['name' => 'trigger_deploy_staging', 'guard_name' => 'web', 'description' => 'Trigger deployments targeting staging nodes'],
-            ['name' => 'trigger_deploy_production', 'guard_name' => 'web', 'description' => 'Trigger deployments targeting production nodes'],
-            ['name' => 'approve_production_deploy', 'guard_name' => 'web', 'description' => 'Approve or reject production deployment gates'],
-            ['name' => 'cancel_deployment', 'guard_name' => 'web', 'description' => 'Abort in-flight deployment pipelines'],
-            ['name' => 'trigger_rollback', 'guard_name' => 'web', 'description' => 'Execute release rollbacks to stable commit checkpoints'],
-            ['name' => 'view_deployment_logs', 'guard_name' => 'web', 'description' => 'View streaming and historical deployment logs'],
-            ['name' => 'view_audit_logs', 'guard_name' => 'web', 'description' => 'View tamper-evident audit logs and security events'],
-            ['name' => 'manage_users', 'guard_name' => 'web', 'description' => 'Manage system users and access roles'],
-            ['name' => 'manage_system_settings', 'guard_name' => 'web', 'description' => 'Configure CoreSentinel engine settings and keys'],
+            ['name' => 'view_dashboard', 'category' => 'dashboard', 'description' => 'View system metrics and pipeline status'],
+            ['name' => 'manage_servers', 'category' => 'infrastructure', 'description' => 'Register, edit and decommission target servers'],
+            ['name' => 'view_servers', 'category' => 'infrastructure', 'description' => 'View connected server nodes and heartbeats'],
+            ['name' => 'manage_repositories', 'category' => 'repositories', 'description' => 'Register and configure Git repositories and credentials'],
+            ['name' => 'view_repositories', 'category' => 'repositories', 'description' => 'View connected Git repositories'],
+            ['name' => 'manage_projects', 'category' => 'projects', 'description' => 'Configure environment project bindings and rules'],
+            ['name' => 'view_projects', 'category' => 'projects', 'description' => 'View project mappings and deployment paths'],
+            ['name' => 'trigger_deploy_development', 'category' => 'deployments', 'description' => 'Trigger deployments targeting development nodes'],
+            ['name' => 'trigger_deploy_testing', 'category' => 'deployments', 'description' => 'Trigger deployments targeting testing/qa nodes'],
+            ['name' => 'trigger_deploy_staging', 'category' => 'deployments', 'description' => 'Trigger deployments targeting staging nodes'],
+            ['name' => 'trigger_deploy_production', 'category' => 'deployments', 'description' => 'Trigger deployments targeting production nodes'],
+            ['name' => 'approve_production_deploy', 'category' => 'approvals', 'description' => 'Approve or reject production deployment gates'],
+            ['name' => 'cancel_deployment', 'category' => 'deployments', 'description' => 'Abort in-flight deployment pipelines'],
+            ['name' => 'trigger_rollback', 'category' => 'deployments', 'description' => 'Execute release rollbacks to stable commit checkpoints'],
+            ['name' => 'view_deployment_logs', 'category' => 'deployments', 'description' => 'View streaming and historical deployment logs'],
+            ['name' => 'view_audit_logs', 'category' => 'governance', 'description' => 'View tamper-evident audit logs and security events'],
+            ['name' => 'manage_users', 'category' => 'users', 'description' => 'Manage system users and access roles'],
+            ['name' => 'manage_system_settings', 'category' => 'system', 'description' => 'Configure CoreSentinel engine settings and keys'],
         ];
 
         foreach ($permissions as $p) {
@@ -47,16 +47,16 @@ class DatabaseSeeder extends Seeder
         // 2. Seed RBAC Roles
         $superAdminRole = Role::firstOrCreate(
             ['name' => 'super_admin'],
-            ['label' => 'Super Administrator', 'description' => 'Full administrative control over all system nodes and operations']
+            ['display_name' => 'Super Administrator', 'description' => 'Full administrative control over all system nodes and operations']
         );
         $superAdminRole->permissions()->sync(Permission::all());
 
         $roles = [
-            ['name' => 'admin', 'label' => 'Administrator', 'description' => 'Manage infrastructure, repositories and users'],
-            ['name' => 'developer', 'label' => 'Developer', 'description' => 'Trigger non-production deployments and view logs'],
-            ['name' => 'deployment_operator', 'label' => 'Deployment Operator', 'description' => 'Execute deployments across environments and trigger rollbacks'],
-            ['name' => 'viewer', 'label' => 'Viewer', 'description' => 'Read-only access to dashboards and status metrics'],
-            ['name' => 'auditor', 'label' => 'Auditor', 'description' => 'Inspect compliance trails and security audit logs'],
+            ['name' => 'admin', 'display_name' => 'Administrator', 'description' => 'Manage infrastructure, repositories and users'],
+            ['name' => 'developer', 'display_name' => 'Developer', 'description' => 'Trigger non-production deployments and view logs'],
+            ['name' => 'deployment_operator', 'display_name' => 'Deployment Operator', 'description' => 'Execute deployments across environments and trigger rollbacks'],
+            ['name' => 'viewer', 'display_name' => 'Viewer', 'description' => 'Read-only access to dashboards and status metrics'],
+            ['name' => 'auditor', 'display_name' => 'Auditor', 'description' => 'Inspect compliance trails and security audit logs'],
         ];
 
         foreach ($roles as $r) {

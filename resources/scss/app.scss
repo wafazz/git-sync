@@ -106,26 +106,6 @@ body {
   font-weight: 600;
 }
 
-.sidebar-nav .nav-link.nav-link-dashboard {
-  color: #fbbf24;
-  font-weight: 600;
-
-  &:hover {
-    color: #fde68a;
-    background: #1e293b;
-  }
-
-  &.active {
-    color: #f59e0b;
-    background: rgba(245, 158, 11, 0.15);
-    font-weight: 700;
-  }
-
-  svg {
-    color: #fbbf24;
-  }
-}
-
 .sidebar-section-header {
   font-size: 0.75rem;
   font-weight: 700;
