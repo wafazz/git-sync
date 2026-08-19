@@ -181,4 +181,19 @@ class DeploymentFlowTest extends TestCase
         $res2->assertStatus(200);
         $res2->assertJson(['message' => 'Duplicate webhook delivery ignored']);
     }
+
+    public function test_user_can_login_and_logout(): void
+    {
+        $loginRes = $this->post('/login', [
+            'email' => $this->user->email,
+            'password' => 'password',
+        ]);
+
+        $loginRes->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($this->user);
+
+        $logoutRes = $this->post('/logout');
+        $logoutRes->assertRedirect('/login');
+        $this->assertGuest();
+    }
 }
