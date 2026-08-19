@@ -80,7 +80,7 @@ class DatabaseSeeder extends Seeder
             ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
             ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
             ['step_order' => 3, 'action_verb' => 'git_reset', 'timeout_seconds' => 60],
-            ['step_order' => 4, 'action_verb' => 'composer_install', 'timeout_seconds' => 300],
+            ['step_order' => 4, 'action_verb' => 'composer_update', 'timeout_seconds' => 300],
             ['step_order' => 5, 'action_verb' => 'npm_install', 'timeout_seconds' => 300],
             ['step_order' => 6, 'action_verb' => 'npm_build', 'timeout_seconds' => 300],
             ['step_order' => 7, 'action_verb' => 'artisan_migrate', 'timeout_seconds' => 180],

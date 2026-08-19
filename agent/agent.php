@@ -194,6 +194,8 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
             return ($job['commit_sha'] !== 'HEAD' && ! empty($job['commit_sha']))
                 ? "git reset --hard {$commit}"
                 : "git reset --hard origin/{$job['branch']}";
+        case 'composer_update':
+            return 'composer update --no-interaction --prefer-dist --optimize-autoloader';
         case 'composer_install':
             return 'composer install --no-interaction --prefer-dist --optimize-autoloader';
         case 'npm_install':
