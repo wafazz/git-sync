@@ -181,6 +181,7 @@ function executeDeploymentJob(string $serverUrl, array $headers, array $job)
 
 function buildAllowlistedCommand(string $verb, array $job): ?string
 {
+    $verb = trim(strtolower($verb));
     $branch = escapeshellarg($job['branch']);
     $commit = escapeshellarg($job['commit_sha']);
     $repoUrl = escapeshellarg($job['repo_url']);
