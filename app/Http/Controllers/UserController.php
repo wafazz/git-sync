@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,6 +17,11 @@ class UserController extends Controller
 {
     public function index(): Response
     {
+        // Auto-provision standard roles & permissions if table is empty
+        if (Role::count() === 0) {
+            (new RolesAndPermissionsSeeder)->run();
+        }
+
         $users = User::with('roles')
             ->latest()
             ->get();

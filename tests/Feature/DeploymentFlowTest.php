@@ -7,6 +7,7 @@ use App\Models\DeploymentProfile;
 use App\Models\GitProvider;
 use App\Models\GitRepository;
 use App\Models\Project;
+use App\Models\Role;
 use App\Models\Server;
 use App\Models\ServerAgent;
 use App\Models\User;
@@ -195,5 +196,27 @@ class DeploymentFlowTest extends TestCase
         $logoutRes = $this->post('/logout');
         $logoutRes->assertRedirect('/login');
         $this->assertGuest();
+    }
+
+    public function test_users_index_renders_successfully(): void
+    {
+        $response = $this->actingAs($this->user)->get('/users');
+        $response->assertStatus(200);
+    }
+
+    public function test_register_new_user_and_update_role(): void
+    {
+        $role = Role::first();
+
+        $createRes = $this->actingAs($this->user)->post('/users', [
+            'name' => 'Developer Two',
+            'email' => 'dev2@company.local',
+            'password' => 'secret1234',
+            'role_ids' => [$role->id],
+            'status' => 'active',
+        ]);
+
+        $createRes->assertRedirect();
+        $this->assertDatabaseHas('users', ['email' => 'dev2@company.local']);
     }
 }
