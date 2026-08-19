@@ -83,7 +83,7 @@ body {
 }
 
 .sidebar-nav .nav-link {
-  color: #94a3b8;
+  color: #e2e8f0;
   padding: 0.65rem 0.9rem;
   border-radius: 0.5rem;
   margin-bottom: 0.25rem;
@@ -96,13 +96,13 @@ body {
 }
 
 .sidebar-nav .nav-link:hover {
-  color: #f8fafc;
+  color: #ffffff;
   background: #1e293b;
 }
 
 .sidebar-nav .nav-link.active {
   color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(56, 189, 248, 0.15);
   font-weight: 600;
 }
 
@@ -110,8 +110,8 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
   padding: 1rem 0.9rem 0.4rem;
 }
 
