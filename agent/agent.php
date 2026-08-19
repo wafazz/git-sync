@@ -188,9 +188,9 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
 
     switch ($verb) {
         case 'git_fetch':
-            return "GIT_TERMINAL_PROMPT=0 if [ ! -d .git ]; then git clone -b {$branch} {$repoUrl} . ; else git remote set-url origin {$repoUrl} && git fetch --prune origin ; fi";
+            return "if [ ! -d .git ]; then git clone -b {$branch} {$repoUrl} . ; else git remote set-url origin {$repoUrl} && git fetch --prune origin ; fi";
         case 'git_checkout':
-            return "GIT_TERMINAL_PROMPT=0 git checkout {$branch} && git pull origin {$branch}";
+            return "git checkout {$branch} && git pull origin {$branch}";
         case 'git_reset':
             return ($job['commit_sha'] !== 'HEAD' && ! empty($job['commit_sha']))
                 ? "git reset --hard {$commit}"
@@ -230,7 +230,12 @@ function runAndStreamProcess(string $cmd, string $cwd, callable $callback): int
         2 => ['pipe', 'w'],
     ];
 
-    $process = proc_open($cmd, $descriptors, $pipes, $cwd);
+    $env = array_merge($_ENV, getenv() ?: [], [
+        'GIT_TERMINAL_PROMPT' => '0',
+        'COMPOSER_ALLOW_SUPERUSER' => '1',
+    ]);
+
+    $process = proc_open($cmd, $descriptors, $pipes, $cwd, $env);
     if (! is_resource($process)) {
         $callback('stderr', "Failed to spawn process for command: {$cmd}\n");
 
