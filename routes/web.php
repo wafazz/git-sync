@@ -35,6 +35,8 @@ Route::middleware('auth')->group(function () {
     // Repositories Management
     Route::get('/repositories', [RepositoryController::class, 'index'])->name('repositories.index');
     Route::post('/repositories', [RepositoryController::class, 'store'])->name('repositories.store');
+    Route::put('/repositories/{repository}', [RepositoryController::class, 'update'])->name('repositories.update');
+    Route::delete('/repositories/{repository}', [RepositoryController::class, 'destroy'])->name('repositories.destroy');
 
     // Projects Management
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');

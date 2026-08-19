@@ -128,12 +128,32 @@ class AgentApiController extends Controller
             return response()->json(['job' => null]);
         }
 
+        $repo = $job->project->repository;
+        $repoUrl = $repo->repo_url;
+
+        // If repository has stored PAT credential, inject token for private repo operations
+        if ($repo->credential && ! empty($repo->credential->encrypted_payload) && $repo->auth_type === 'pat') {
+            $token = $repo->credential->encrypted_payload;
+            if (str_starts_with($repoUrl, 'https://') && ! str_contains($repoUrl, '@')) {
+                $parsed = parse_url($repoUrl);
+                $host = $parsed['host'] ?? 'github.com';
+                $path = ltrim($parsed['path'] ?? '', '/');
+                if (str_contains($host, 'github.com')) {
+                    $repoUrl = "https://x-access-token:{$token}@{$host}/{$path}";
+                } elseif (str_contains($host, 'gitlab.com')) {
+                    $repoUrl = "https://oauth2:{$token}@{$host}/{$path}";
+                } else {
+                    $repoUrl = "https://{$token}@{$host}/{$path}";
+                }
+            }
+        }
+
         return response()->json([
             'job' => [
                 'id' => $job->id,
                 'uuid' => $job->uuid,
                 'project_name' => $job->project->name,
-                'repo_url' => $job->project->repository->repo_url,
+                'repo_url' => $repoUrl,
                 'branch' => $job->branch,
                 'commit_sha' => $job->commit_sha,
                 'deploy_path' => $job->project->deploy_path,

@@ -1,8 +1,23 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import { GitRepository, GitProvider } from '@/types';
-import { FolderGit2, Plus, GitBranch, Key, ShieldCheck, Lock, CheckCircle2, ExternalLink, Webhook as WebhookIcon, Copy, Check, Info } from 'lucide-react';
+import { 
+  FolderGit2, 
+  Plus, 
+  GitBranch, 
+  Key, 
+  ShieldCheck, 
+  Lock, 
+  CheckCircle2, 
+  ExternalLink, 
+  Webhook as WebhookIcon, 
+  Copy, 
+  Check, 
+  Info,
+  Edit3,
+  Trash2
+} from 'lucide-react';
 
 interface Props {
   repositories: GitRepository[];
@@ -11,12 +26,25 @@ interface Props {
 
 export default function RepositoriesIndex({ repositories = [], providers = [] }: Props) {
   const [showModal, setShowModal] = useState(false);
+  const [editRepo, setEditRepo] = useState<GitRepository | null>(null);
   const [webhookModalRepo, setWebhookModalRepo] = useState<GitRepository | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Connect Form
   const { data, setData, post, processing, errors, reset } = useForm({
     name: '',
     provider_id: providers[0]?.id || 1,
+    repo_url: '',
+    owner_org: '',
+    default_branch: 'main',
+    auth_type: 'pat',
+    credential_token: '',
+  });
+
+  // Edit Form
+  const editForm = useForm({
+    name: '',
+    provider_id: 1,
     repo_url: '',
     owner_org: '',
     default_branch: 'main',
@@ -32,6 +60,36 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
         setShowModal(false);
       },
     });
+  };
+
+  const handleEditClick = (repo: GitRepository) => {
+    setEditRepo(repo);
+    editForm.setData({
+      name: repo.name,
+      provider_id: repo.provider_id,
+      repo_url: repo.repo_url,
+      owner_org: repo.owner_org || '',
+      default_branch: repo.default_branch,
+      auth_type: repo.auth_type,
+      credential_token: '',
+    });
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editRepo) return;
+
+    editForm.put(`/repositories/${editRepo.id}`, {
+      onSuccess: () => {
+        setEditRepo(null);
+      },
+    });
+  };
+
+  const handleDelete = (repo: GitRepository) => {
+    if (confirm(`Are you sure you want to remove repository [${repo.name}]?`)) {
+      router.delete(`/repositories/${repo.id}`);
+    }
   };
 
   const copyToClipboard = (text: string, field: string) => {
@@ -129,14 +187,31 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
                       </span>
                     </td>
                     <td className="text-end">
-                      <button
-                        className="btn btn-outline-info btn-sm d-inline-flex align-items-center gap-1"
-                        style={{ fontSize: '0.75rem' }}
-                        onClick={() => setWebhookModalRepo(repo)}
-                      >
-                        <WebhookIcon size={13} />
-                        <span>Configure Webhook</span>
-                      </button>
+                      <div className="d-inline-flex align-items-center gap-1">
+                        <button
+                          className="btn btn-outline-info btn-sm d-inline-flex align-items-center gap-1"
+                          style={{ fontSize: '0.75rem' }}
+                          title="Configure Webhook"
+                          onClick={() => setWebhookModalRepo(repo)}
+                        >
+                          <WebhookIcon size={13} />
+                          <span>Webhook</span>
+                        </button>
+                        <button
+                          className="btn btn-outline-secondary btn-sm p-1 px-2"
+                          title="Edit Repository & Credentials"
+                          onClick={() => handleEditClick(repo)}
+                        >
+                          <Edit3 size={13} className="text-info" />
+                        </button>
+                        <button
+                          className="btn btn-outline-secondary btn-sm p-1 px-2"
+                          title="Delete Repository"
+                          onClick={() => handleDelete(repo)}
+                        >
+                          <Trash2 size={13} className="text-danger" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -254,6 +329,97 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Repository Modal */}
+      {editRepo && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content bg-dark border-secondary border-opacity-50 text-light shadow-lg">
+              <div className="modal-header border-secondary border-opacity-25">
+                <h5 className="modal-title fw-bold d-flex align-items-center gap-2">
+                  <Edit3 size={18} className="text-info" />
+                  <span>Edit Repository: {editRepo.name}</span>
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setEditRepo(null)}></button>
+              </div>
+              <form onSubmit={handleEditSubmit}>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label small text-secondary">Repository Display Name *</label>
+                    <input
+                      type="text"
+                      className="form-control bg-dark text-light border-secondary border-opacity-50"
+                      value={editForm.data.name}
+                      onChange={(e) => editForm.setData('name', e.target.value)}
+                      required
+                    />
+                    {editForm.errors.name && <div className="text-danger small mt-1">{editForm.errors.name}</div>}
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label small text-secondary">Repository Clone URL (HTTPS / SSH) *</label>
+                    <input
+                      type="text"
+                      className="form-control bg-dark text-light border-secondary border-opacity-50"
+                      value={editForm.data.repo_url}
+                      onChange={(e) => editForm.setData('repo_url', e.target.value)}
+                      required
+                    />
+                    {editForm.errors.repo_url && <div className="text-danger small mt-1">{editForm.errors.repo_url}</div>}
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-6">
+                      <label className="form-label small text-secondary">Default Branch *</label>
+                      <input
+                        type="text"
+                        className="form-control bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.default_branch}
+                        onChange={(e) => editForm.setData('default_branch', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label small text-secondary">Auth Method *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.auth_type}
+                        onChange={(e: any) => editForm.setData('auth_type', e.target.value)}
+                      >
+                        <option value="pat">Personal Access Token</option>
+                        <option value="ssh_key">SSH Deploy Key</option>
+                        <option value="github_app">GitHub App Integration</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label small text-secondary">Update Personal Access Token / Deploy Key</label>
+                    <textarea
+                      className="form-control bg-dark text-light border-secondary border-opacity-50 font-monospace small"
+                      rows={3}
+                      placeholder="Leave blank to keep existing encrypted token, or paste new ghp_..."
+                      value={editForm.data.credential_token}
+                      onChange={(e) => editForm.setData('credential_token', e.target.value)}
+                    ></textarea>
+                    <div className="text-secondary small mt-1">
+                      <Lock size={12} className="me-1" /> Re-encrypted with AES-256-GCM before saving.
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer border-secondary border-opacity-25">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditRepo(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={editForm.processing}>
+                    {editForm.processing ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

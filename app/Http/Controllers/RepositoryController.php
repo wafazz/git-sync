@@ -85,4 +85,82 @@ class RepositoryController extends Controller
             'success' => "Repository [{$repo->name}] connected securely.",
         ]);
     }
+
+    public function update(Request $request, GitRepository $repository): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'provider_id' => 'required|exists:git_providers,id',
+            'repo_url' => 'required|string|max:500',
+            'owner_org' => 'nullable|string|max:100',
+            'default_branch' => 'required|string|max:100',
+            'auth_type' => 'required|in:pat,ssh_key,github_app',
+            'credential_token' => 'nullable|string',
+        ]);
+
+        // If a new credential token was provided, update or create
+        if (! empty($validated['credential_token'])) {
+            if ($repository->credential) {
+                $repository->credential->update([
+                    'auth_type' => $validated['auth_type'],
+                    'encrypted_payload' => $validated['credential_token'],
+                ]);
+            } else {
+                $credential = GitCredential::create([
+                    'name' => "{$validated['name']} Credential",
+                    'auth_type' => $validated['auth_type'],
+                    'encrypted_payload' => $validated['credential_token'],
+                    'created_by' => auth()->id(),
+                ]);
+                $repository->update(['credential_id' => $credential->id]);
+            }
+        }
+
+        $repository->update([
+            'provider_id' => $validated['provider_id'],
+            'name' => $validated['name'],
+            'repo_url' => $validated['repo_url'],
+            'owner_org' => $validated['owner_org'],
+            'default_branch' => $validated['default_branch'],
+            'auth_type' => $validated['auth_type'],
+        ]);
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'repository.updated',
+            'auditable_type' => GitRepository::class,
+            'auditable_id' => $repository->id,
+            'ip_address' => $request->ip() ?? '127.0.0.1',
+            'new_values' => ['name' => $repository->name, 'url' => $repository->repo_url],
+        ]);
+
+        return redirect()->back()->with('flash', [
+            'success' => "Repository [{$repository->name}] updated successfully.",
+        ]);
+    }
+
+    public function destroy(GitRepository $repository): RedirectResponse
+    {
+        if ($repository->projects()->exists()) {
+            return redirect()->back()->with('flash', [
+                'error' => "Cannot delete repository [{$repository->name}] because it is currently linked to active projects.",
+            ]);
+        }
+
+        $name = $repository->name;
+        $repository->delete();
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'repository.deleted',
+            'auditable_type' => GitRepository::class,
+            'auditable_id' => $repository->id,
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'old_values' => ['name' => $name],
+        ]);
+
+        return redirect()->back()->with('flash', [
+            'success' => "Repository [{$name}] removed successfully.",
+        ]);
+    }
 }
