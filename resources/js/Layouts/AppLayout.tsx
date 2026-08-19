@@ -94,6 +94,10 @@ export default function AppLayout({ title, breadcrumbs, children }: PropsWithChi
           </Link>
 
           <div className="sidebar-section-header">Governance & Audit</div>
+          <Link href="/users" className={`nav-link ${isActive('/users') ? 'active' : ''}`}>
+            <UserIcon size={18} />
+            <span>Users & RBAC</span>
+          </Link>
           <Link href="/audit-logs" className={`nav-link ${isActive('/audit-logs') ? 'active' : ''}`}>
             <ShieldCheck size={18} />
             <span>Audit Trail</span>
