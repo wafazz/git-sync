@@ -83,9 +83,9 @@ class DatabaseSeeder extends Seeder
         // 5. Seed Comprehensive Deployment Profiles Library
         $profilesData = [
             [
-                'name' => 'Laravel 12 Standard (Testing / QA)',
-                'framework' => 'laravel12',
-                'description' => 'Full automated test pipeline with composer update, npm build, migrations, and health check',
+                'name' => 'Laravel Universal (v11 / v12 / v13+ Testing)',
+                'framework' => 'laravel',
+                'description' => 'Full automated test pipeline with composer update, npm build, migrations, and health check for Laravel 11, 12, 13+',
                 'steps' => [
                     ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
                     ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
@@ -99,9 +99,9 @@ class DatabaseSeeder extends Seeder
                 ],
             ],
             [
-                'name' => 'Laravel 12 Production Zero-Downtime',
-                'framework' => 'laravel12',
-                'description' => 'Production hardened pipeline with queue worker reboot, forced migrations, and health verification',
+                'name' => 'Laravel Production Zero-Downtime (v11 / v12 / v13+)',
+                'framework' => 'laravel',
+                'description' => 'Production hardened pipeline with queue worker reboot, forced migrations, and health verification for Laravel 11, 12, 13+',
                 'steps' => [
                     ['step_order' => 1, 'action_verb' => 'git_fetch', 'timeout_seconds' => 120],
                     ['step_order' => 2, 'action_verb' => 'git_checkout', 'timeout_seconds' => 60],
