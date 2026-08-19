@@ -79,7 +79,10 @@ export default function ServersIndex({ servers = [] }: Props) {
               </div>
             </div>
             <div className="text-secondary small">
-              <strong>Agent Setup Command:</strong> <code>curl -sSL https://get.coresentinel.local/agent.sh | bash -s -- --token={registeredAgent.token}</code>
+              <strong>Quick Install Command (run on target VPS):</strong>
+              <div className="bg-dark p-2 rounded mt-1 font-monospace text-info small text-break">
+                curl -sSL https://raw.githubusercontent.com/wafazz/git-sync/main/agent/install.sh | bash -s -- --url={window.location.origin} --token={registeredAgent.token}
+              </div>
             </div>
           </div>
         </div>
