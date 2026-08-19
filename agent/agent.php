@@ -200,9 +200,9 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
         case 'composer_install':
             return 'COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs';
         case 'npm_install':
-            return 'npm install --no-audit';
+            return 'if [ -f package.json ]; then npm install --no-audit ; else echo "[SKIP] No package.json found, skipping npm_install." ; fi';
         case 'npm_build':
-            return 'npm run build';
+            return 'if [ -f package.json ] && grep -q \'"build"\' package.json; then NODE_OPTIONS="--max-old-space-size=2048" npm run build ; else echo "[SKIP] No build script in package.json, skipping npm_build." ; fi';
         case 'artisan_migrate':
             return 'php artisan migrate --force';
         case 'artisan_optimize':
