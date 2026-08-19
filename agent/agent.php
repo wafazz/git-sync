@@ -195,9 +195,9 @@ function buildAllowlistedCommand(string $verb, array $job): ?string
                 ? "git reset --hard {$commit}"
                 : "git reset --hard origin/{$job['branch']}";
         case 'composer_update':
-            return 'composer update --no-interaction --prefer-dist --optimize-autoloader';
+            return 'COMPOSER_ALLOW_SUPERUSER=1 composer update --no-interaction --prefer-dist --optimize-autoloader';
         case 'composer_install':
-            return 'composer install --no-interaction --prefer-dist --optimize-autoloader';
+            return 'COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs';
         case 'npm_install':
             return 'npm install --no-audit';
         case 'npm_build':
