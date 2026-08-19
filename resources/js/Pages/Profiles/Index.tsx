@@ -91,18 +91,31 @@ export default function ProfilesIndex({ profiles = [] }: Props) {
   };
 
   const filteredProfiles = profiles.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.framework.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    const fw = (p.framework || '').toLowerCase();
+    const name = (p.name || '').toLowerCase();
+    const desc = (p.description || '').toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
 
+    const matchesSearch = !q || name.includes(q) || fw.includes(q) || desc.includes(q);
     if (!matchesSearch) return false;
+
     if (filterCategory === 'all') return true;
-    if (filterCategory === 'laravel' && p.framework.includes('laravel')) return true;
-    if (filterCategory === 'node' && (p.framework.includes('spa') || p.framework.includes('node') || p.framework.includes('react'))) return true;
-    if (filterCategory === 'docker' && p.framework.includes('docker')) return true;
-    if (filterCategory === 'python' && p.framework.includes('python')) return true;
-    if (filterCategory === 'static' && p.framework.includes('static')) return true;
-    return true;
+    if (filterCategory === 'laravel') {
+      return fw.includes('laravel') || fw.includes('php') || name.includes('laravel') || name.includes('php');
+    }
+    if (filterCategory === 'node') {
+      return fw.includes('node') || fw.includes('react') || fw.includes('vue') || fw.includes('spa') || name.includes('react') || name.includes('node') || name.includes('next') || name.includes('vite');
+    }
+    if (filterCategory === 'docker') {
+      return fw.includes('docker') || name.includes('docker');
+    }
+    if (filterCategory === 'python') {
+      return fw.includes('python') || fw.includes('django') || fw.includes('fastapi') || name.includes('python');
+    }
+    if (filterCategory === 'static') {
+      return fw.includes('static') || name.includes('static') || name.includes('html') || name.includes('astro') || name.includes('hugo');
+    }
+    return false;
   });
 
   return (
