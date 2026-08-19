@@ -64,6 +64,58 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function update(Request $request, Project $project): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'repository_id' => 'required|exists:git_repositories,id',
+            'server_id' => 'required|exists:servers,id',
+            'deployment_profile_id' => 'required|exists:deployment_profiles,id',
+            'target_branch' => 'required|string|max:100',
+            'environment' => 'required|in:development,testing,staging,production',
+            'deploy_path' => 'required|string|max:500',
+            'health_check_url' => 'nullable|string|max:500',
+            'auto_deploy_on_push' => 'boolean',
+            'requires_approval' => 'boolean',
+        ]);
+
+        $oldValues = $project->only(array_keys($validated));
+        $project->update($validated);
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'project.updated',
+            'auditable_type' => Project::class,
+            'auditable_id' => $project->id,
+            'ip_address' => $request->ip() ?? '127.0.0.1',
+            'old_values' => $oldValues,
+            'new_values' => $validated,
+        ]);
+
+        return redirect()->back()->with('flash', [
+            'success' => "Project [{$project->name}] updated successfully.",
+        ]);
+    }
+
+    public function destroy(Project $project): RedirectResponse
+    {
+        $name = $project->name;
+        $project->delete();
+
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'project.deleted',
+            'auditable_type' => Project::class,
+            'auditable_id' => $project->id,
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'old_values' => ['name' => $name],
+        ]);
+
+        return redirect()->back()->with('flash', [
+            'success' => "Project [{$name}] removed successfully.",
+        ]);
+    }
+
     public function triggerDeploy(Project $project, DeploymentEngine $engine): RedirectResponse
     {
         $deployment = $engine->requestDeployment(

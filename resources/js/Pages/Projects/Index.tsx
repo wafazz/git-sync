@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import { Project, GitRepository, Server as ServerType, DeploymentProfile } from '@/types';
-import { GitBranch, Plus, Server, Play, FolderGit2, Sliders, CheckCircle2, AlertCircle } from 'lucide-react';
+import { 
+  GitBranch, 
+  Plus, 
+  Server, 
+  Play, 
+  FolderGit2, 
+  Sliders, 
+  CheckCircle2, 
+  AlertCircle,
+  Edit3,
+  Trash2
+} from 'lucide-react';
 
 interface Props {
   projects: Project[];
@@ -13,7 +24,9 @@ interface Props {
 
 export default function ProjectsIndex({ projects = [], repositories = [], servers = [], profiles = [] }: Props) {
   const [showModal, setShowModal] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
 
+  // Create Form
   const { data, setData, post, processing, errors, reset } = useForm({
     name: '',
     repository_id: repositories[0]?.id || '',
@@ -23,6 +36,20 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
     environment: 'testing',
     deploy_path: '/var/www/my-project',
     health_check_url: 'http://127.0.0.1:8000/up',
+    auto_deploy_on_push: true,
+    requires_approval: false,
+  });
+
+  // Edit Form
+  const editForm = useForm({
+    name: '',
+    repository_id: '',
+    server_id: '',
+    deployment_profile_id: '',
+    target_branch: 'main',
+    environment: 'testing',
+    deploy_path: '',
+    health_check_url: '',
     auto_deploy_on_push: true,
     requires_approval: false,
   });
@@ -37,9 +64,42 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
     });
   };
 
+  const handleEditClick = (project: Project) => {
+    setEditProject(project);
+    editForm.setData({
+      name: project.name,
+      repository_id: project.repository_id,
+      server_id: project.server_id,
+      deployment_profile_id: project.deployment_profile_id,
+      target_branch: project.target_branch,
+      environment: project.environment,
+      deploy_path: project.deploy_path,
+      health_check_url: project.health_check_url || '',
+      auto_deploy_on_push: project.auto_deploy_on_push,
+      requires_approval: project.requires_approval,
+    });
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProject) return;
+
+    editForm.put(`/projects/${editProject.id}`, {
+      onSuccess: () => {
+        setEditProject(null);
+      },
+    });
+  };
+
+  const handleDelete = (project: Project) => {
+    if (confirm(`Are you sure you want to remove project binding [${project.name}]?`)) {
+      router.delete(`/projects/${project.id}`);
+    }
+  };
+
   const handleDeploy = (projectId: number) => {
     if (confirm('Trigger deployment for this project now?')) {
-      post(`/projects/${projectId}/deploy`);
+      router.post(`/projects/${projectId}/deploy`);
     }
   };
 
@@ -47,6 +107,7 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
     <AppLayout breadcrumbs={[{ label: 'Home', href: '/dashboard' }, { label: 'Projects' }]}>
       <Head title="Projects & Environments - Git Deployment Synchronizer" />
 
+      {/* Page Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
         <div>
           <h3 className="fw-bold mb-1 text-light">Projects & Environment Bindings</h3>
@@ -101,28 +162,56 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
                   </div>
                   <div className="mb-2 text-secondary small d-flex align-items-center gap-2">
                     <Server size={14} className="text-info" />
-                    <span>Server: <strong className="text-light">{project.server?.name || 'Server'}</strong></span>
+                    <span>Server: <strong className="text-light">{project.server?.name || 'Unassigned'}</strong></span>
                   </div>
                   <div className="mb-3 text-secondary small d-flex align-items-center gap-2">
                     <Sliders size={14} className="text-info" />
-                    <span>Profile: {project.profile?.name || 'Standard Profile'}</span>
+                    <span className="text-truncate">Profile: <strong className="text-light">{project.profile?.name || 'Standard'}</strong></span>
                   </div>
 
-                  <div className="bg-body-tertiary p-2 rounded small text-secondary mb-3 font-monospace" style={{ fontSize: '0.75rem' }}>
-                    Deploy Path: {project.deploy_path}
+                  <div className="p-2 bg-body-tertiary rounded border border-secondary border-opacity-25 mb-3 font-monospace small text-secondary text-truncate">
+                    Path: {project.deploy_path}
                   </div>
 
-                  <div className="d-flex justify-content-between align-items-center border-top border-secondary border-opacity-25 pt-3">
-                    <span className="text-secondary small">
-                      {project.auto_deploy_on_push ? 'Auto-deploy on Push' : 'Manual Trigger'}
-                    </span>
-                    <button
+                  {project.latest_deployment && (
+                    <div className="mb-3 p-2 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25 small">
+                      <div className="text-secondary d-flex justify-content-between">
+                        <span>Last Deploy #{project.latest_deployment.id}:</span>
+                        <span className={`fw-bold ${
+                          project.latest_deployment.status === 'success' ? 'text-success' :
+                          project.latest_deployment.status === 'failed' ? 'text-danger' : 'text-info'
+                        }`}>
+                          {project.latest_deployment.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="d-flex align-items-center justify-content-between pt-2 border-top border-secondary border-opacity-25">
+                    <button 
                       className="btn btn-primary btn-sm d-flex align-items-center gap-1"
                       onClick={() => handleDeploy(project.id)}
                     >
                       <Play size={14} />
                       <span>Deploy Now</span>
                     </button>
+
+                    <div className="d-flex align-items-center gap-1">
+                      <button
+                        className="btn btn-outline-secondary btn-sm p-1 px-2"
+                        title="Edit Project Binding"
+                        onClick={() => handleEditClick(project)}
+                      >
+                        <Edit3 size={14} className="text-info" />
+                      </button>
+                      <button
+                        className="btn btn-outline-secondary btn-sm p-1 px-2"
+                        title="Delete Project"
+                        onClick={() => handleDelete(project)}
+                      >
+                        <Trash2 size={14} className="text-danger" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -131,32 +220,240 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
         )}
       </div>
 
+      {/* Edit Project Modal */}
+      {editProject && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content bg-dark border-secondary border-opacity-50 text-light shadow-lg">
+              <div className="modal-header border-secondary border-opacity-25">
+                <h5 className="modal-title fw-bold d-flex align-items-center gap-2">
+                  <Edit3 size={18} className="text-info" />
+                  <span>Edit Project: {editProject.name}</span>
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setEditProject(null)}></button>
+              </div>
+              <form onSubmit={handleEditSubmit}>
+                <div className="modal-body">
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Project Name *</label>
+                      <input
+                        type="text"
+                        className="form-control bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.name}
+                        onChange={(e) => editForm.setData('name', e.target.value)}
+                        required
+                      />
+                      {editForm.errors.name && <div className="text-danger small mt-1">{editForm.errors.name}</div>}
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Target Server *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.server_id}
+                        onChange={(e) => editForm.setData('server_id', e.target.value)}
+                        required
+                      >
+                        {servers.map((srv) => (
+                          <option key={srv.id} value={srv.id}>{srv.name} ({srv.environment})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Git Repository *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.repository_id}
+                        onChange={(e) => editForm.setData('repository_id', e.target.value)}
+                        required
+                      >
+                        {repositories.map((repo) => (
+                          <option key={repo.id} value={repo.id}>{repo.name} ({repo.default_branch})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Deployment Profile (Recipe) *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.deployment_profile_id}
+                        onChange={(e) => editForm.setData('deployment_profile_id', e.target.value)}
+                        required
+                      >
+                        {profiles.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Target Git Branch *</label>
+                      <input
+                        type="text"
+                        className="form-control bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.target_branch}
+                        onChange={(e) => editForm.setData('target_branch', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Environment Tier *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={editForm.data.environment}
+                        onChange={(e: any) => editForm.setData('environment', e.target.value)}
+                      >
+                        <option value="development">Development</option>
+                        <option value="testing">Testing</option>
+                        <option value="staging">Staging</option>
+                        <option value="production">Production (Approval Gated)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label small text-secondary">Server Absolute Deploy Path *</label>
+                    <input
+                      type="text"
+                      className="form-control bg-dark text-light border-secondary border-opacity-50 font-monospace small"
+                      value={editForm.data.deploy_path}
+                      onChange={(e) => editForm.setData('deploy_path', e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <div className="form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id="edit_auto_deploy"
+                          checked={editForm.data.auto_deploy_on_push}
+                          onChange={(e) => editForm.setData('auto_deploy_on_push', e.target.checked)}
+                        />
+                        <label className="form-check-label text-secondary small" htmlFor="edit_auto_deploy">
+                          Auto-deploy upon GitHub webhook push
+                        </label>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id="edit_requires_approval"
+                          checked={editForm.data.requires_approval}
+                          onChange={(e) => editForm.setData('requires_approval', e.target.checked)}
+                        />
+                        <label className="form-check-label text-secondary small" htmlFor="edit_requires_approval">
+                          Require CoreSentinel approval gate before execution
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer border-secondary border-opacity-25">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditProject(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={editForm.processing}>
+                    {editForm.processing ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Project Modal */}
       {showModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content bg-dark border-secondary border-opacity-50 text-light shadow">
               <div className="modal-header border-secondary border-opacity-25">
-                <h5 className="modal-title fw-bold">Create Project Environment Binding</h5>
+                <h5 className="modal-title fw-bold">Create Project Binding</h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowModal(false)}></button>
               </div>
               <form onSubmit={handleSubmit}>
                 <div className="modal-body">
                   <div className="row g-3 mb-3">
-                    <div className="col-12 col-md-6">
+                    <div className="col-md-6">
                       <label className="form-label small text-secondary">Project Name *</label>
                       <input
                         type="text"
                         className="form-control bg-dark text-light border-secondary border-opacity-50"
-                        placeholder="e.g. Multi-Kiosk Staging"
+                        placeholder="e.g. Kiosk Frontend Staging"
                         value={data.name}
                         onChange={(e) => setData('name', e.target.value)}
                         required
                       />
                       {errors.name && <div className="text-danger small mt-1">{errors.name}</div>}
                     </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Target Environment *</label>
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Target Server *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={data.server_id}
+                        onChange={(e) => setData('server_id', e.target.value)}
+                        required
+                      >
+                        {servers.map((srv) => (
+                          <option key={srv.id} value={srv.id}>{srv.name} ({srv.environment})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Git Repository *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={data.repository_id}
+                        onChange={(e) => setData('repository_id', e.target.value)}
+                        required
+                      >
+                        {repositories.map((repo) => (
+                          <option key={repo.id} value={repo.id}>{repo.name} ({repo.default_branch})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Deployment Profile (Recipe) *</label>
+                      <select
+                        className="form-select bg-dark text-light border-secondary border-opacity-50"
+                        value={data.deployment_profile_id}
+                        onChange={(e) => setData('deployment_profile_id', e.target.value)}
+                        required
+                      >
+                        {profiles.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Target Git Branch *</label>
+                      <input
+                        type="text"
+                        className="form-control bg-dark text-light border-secondary border-opacity-50"
+                        placeholder="main"
+                        value={data.target_branch}
+                        onChange={(e) => setData('target_branch', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small text-secondary">Environment Tier *</label>
                       <select
                         className="form-select bg-dark text-light border-secondary border-opacity-50"
                         value={data.environment}
@@ -165,117 +462,52 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
                         <option value="development">Development</option>
                         <option value="testing">Testing</option>
                         <option value="staging">Staging</option>
-                        <option value="production">Production</option>
+                        <option value="production">Production (Approval Gated)</option>
                       </select>
                     </div>
                   </div>
 
-                  <div className="row g-3 mb-3">
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Source Git Repository *</label>
-                      <select
-                        className="form-select bg-dark text-light border-secondary border-opacity-50"
-                        value={data.repository_id}
-                        onChange={(e: any) => setData('repository_id', e.target.value)}
-                        required
-                      >
-                        <option value="">Select Repository...</option>
-                        {repositories.map((r) => (
-                          <option key={r.id} value={r.id}>{r.name} ({r.default_branch})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Target Branch *</label>
-                      <input
-                        type="text"
-                        className="form-control bg-dark text-light border-secondary border-opacity-50"
-                        value={data.target_branch}
-                        onChange={(e) => setData('target_branch', e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row g-3 mb-3">
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Target Server Host *</label>
-                      <select
-                        className="form-select bg-dark text-light border-secondary border-opacity-50"
-                        value={data.server_id}
-                        onChange={(e: any) => setData('server_id', e.target.value)}
-                        required
-                      >
-                        <option value="">Select Target Server...</option>
-                        {servers.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.environment})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Deployment Recipe Profile *</label>
-                      <select
-                        className="form-select bg-dark text-light border-secondary border-opacity-50"
-                        value={data.deployment_profile_id}
-                        onChange={(e: any) => setData('deployment_profile_id', e.target.value)}
-                        required
-                      >
-                        <option value="">Select Profile Recipe...</option>
-                        {profiles.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name} ({p.framework})</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="row g-3 mb-3">
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Local Server Deploy Path *</label>
-                      <input
-                        type="text"
-                        className="form-control bg-dark text-light border-secondary border-opacity-50"
-                        placeholder="/var/www/my-project or C:\inetpub\wwwroot\app"
-                        value={data.deploy_path}
-                        onChange={(e) => setData('deploy_path', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label small text-secondary">Post-Deploy Health Check URL</label>
-                      <input
-                        type="text"
-                        className="form-control bg-dark text-light border-secondary border-opacity-50"
-                        placeholder="http://127.0.0.1:8000/up"
-                        value={data.health_check_url}
-                        onChange={(e) => setData('health_check_url', e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-check form-switch mb-2">
+                  <div className="mb-3">
+                    <label className="form-label small text-secondary">Server Absolute Deploy Path *</label>
                     <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="auto_deploy"
-                      checked={data.auto_deploy_on_push}
-                      onChange={(e) => setData('auto_deploy_on_push', e.target.checked)}
+                      type="text"
+                      className="form-control bg-dark text-light border-secondary border-opacity-50 font-monospace small"
+                      placeholder="/var/www/my-app"
+                      value={data.deploy_path}
+                      onChange={(e) => setData('deploy_path', e.target.value)}
+                      required
                     />
-                    <label className="form-check-label small text-light" htmlFor="auto_deploy">
-                      Automatically deploy when webhook push event matches target branch
-                    </label>
                   </div>
 
-                  <div className="form-check form-switch">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id="req_approval"
-                      checked={data.requires_approval}
-                      onChange={(e) => setData('requires_approval', e.target.checked)}
-                    />
-                    <label className="form-check-label small text-light" htmlFor="req_approval">
-                      Require CoreSentinel approval gate sign-off before dispatching to server agent
-                    </label>
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <div className="form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id="auto_deploy"
+                          checked={data.auto_deploy_on_push}
+                          onChange={(e) => setData('auto_deploy_on_push', e.target.checked)}
+                        />
+                        <label className="form-check-label text-secondary small" htmlFor="auto_deploy">
+                          Auto-deploy upon GitHub webhook push
+                        </label>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id="requires_approval"
+                          checked={data.requires_approval}
+                          onChange={(e) => setData('requires_approval', e.target.checked)}
+                        />
+                        <label className="form-check-label text-secondary small" htmlFor="requires_approval">
+                          Require CoreSentinel approval gate before execution
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="modal-footer border-secondary border-opacity-25">
@@ -283,7 +515,7 @@ export default function ProjectsIndex({ projects = [], repositories = [], server
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary btn-sm" disabled={processing}>
-                    {processing ? 'Saving...' : 'Create Project Binding'}
+                    {processing ? 'Creating...' : 'Create Binding'}
                   </button>
                 </div>
               </form>
