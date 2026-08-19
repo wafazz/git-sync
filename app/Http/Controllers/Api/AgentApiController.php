@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Deployment;
+use App\Models\DeploymentStep;
 use App\Models\Server;
 use App\Models\ServerAgent;
 use App\Models\ServerHeartbeat;
@@ -38,24 +39,31 @@ class AgentApiController extends Controller
         }
 
         if (! $matchedAgent) {
-            return response()->json(['error' => 'Invalid enrollment token'], 401);
+            return response()->json(['error' => 'Invalid or expired enrollment token'], 401);
         }
 
-        $secret = Str::random(48);
+        $secret = Str::random(40);
+        $agentUuid = (string) Str::uuid();
+
         $matchedAgent->update([
+            'agent_uuid' => $agentUuid,
             'secret_hash' => Hash::make($secret),
-            'agent_version' => $validated['agent_version'] ?? '1.0.0',
+            'agent_version' => $validated['agent_version'] ?? '1.1.0',
             'last_ip' => $request->ip(),
         ]);
 
-        $matchedAgent->server->update(['status' => 'online', 'last_heartbeat_at' => now()]);
+        $server = $matchedAgent->server;
+        $server->update([
+            'status' => 'online',
+            'last_heartbeat_at' => now(),
+            'ip_address' => $request->ip(),
+        ]);
 
         return response()->json([
-            'message' => 'Agent registered successfully',
-            'agent_uuid' => $matchedAgent->agent_uuid,
+            'agent_uuid' => $agentUuid,
             'secret' => $secret,
-            'server_name' => $matchedAgent->server->name,
-            'environment' => $matchedAgent->server->environment,
+            'server_name' => $server->name,
+            'environment' => $server->environment,
         ]);
     }
 
@@ -155,13 +163,39 @@ class AgentApiController extends Controller
     }
 
     /**
-     * Ingest chunked execution logs.
+     * Ingest chunked execution logs and update step states.
      */
     public function appendLogs(Request $request, Deployment $deployment, DeploymentEngine $engine): JsonResponse
     {
         $stream = $request->input('stream_type', 'stdout');
         $content = $request->input('chunk', '');
         $stepId = $request->input('step_id');
+
+        if ($stepId) {
+            $step = DeploymentStep::where('deployment_id', $deployment->id)->where('id', $stepId)->first();
+            if ($step) {
+                if ($step->status === 'pending' || $step->status === 'queued') {
+                    $step->update([
+                        'status' => 'running',
+                        'started_at' => $step->started_at ?? now(),
+                    ]);
+                }
+
+                if (str_contains($content, '<-- Completed step') || str_contains($content, 'successfully')) {
+                    $step->update([
+                        'status' => 'success',
+                        'exit_code' => 0,
+                        'completed_at' => now(),
+                    ]);
+                } elseif (str_contains($content, 'FAILED: Step') || str_contains($content, 'rejected by agent') || str_contains($content, 'exited with error code')) {
+                    $step->update([
+                        'status' => 'failed',
+                        'exit_code' => 1,
+                        'completed_at' => now(),
+                    ]);
+                }
+            }
+        }
 
         $engine->appendLog($deployment, $stream, $content, $stepId);
 
@@ -184,6 +218,25 @@ class AgentApiController extends Controller
             'duration_seconds' => $duration,
             'error_summary' => $errorSummary,
         ]);
+
+        // Finalize any running steps
+        if ($status === 'success') {
+            DeploymentStep::where('deployment_id', $deployment->id)
+                ->where('status', 'running')
+                ->update([
+                    'status' => 'success',
+                    'exit_code' => 0,
+                    'completed_at' => now(),
+                ]);
+        } else {
+            DeploymentStep::where('deployment_id', $deployment->id)
+                ->where('status', 'running')
+                ->update([
+                    'status' => 'failed',
+                    'exit_code' => $exitCode ?: 1,
+                    'completed_at' => now(),
+                ]);
+        }
 
         $engine->appendLog(
             $deployment,

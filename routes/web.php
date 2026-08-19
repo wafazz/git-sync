@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     // Deployments History & Live Console
     Route::get('/deployments', [DeploymentController::class, 'index'])->name('deployments.index');
     Route::get('/deployments/{deployment}', [DeploymentController::class, 'show'])->name('deployments.show');
+    Route::get('/deployments/{deployment}/stream', [DeploymentController::class, 'stream'])->name('deployments.stream');
     Route::post('/deployments/{deployment}/retry', [DeploymentController::class, 'retry'])->name('deployments.retry');
     Route::post('/deployments/{deployment}/rollback', [DeploymentController::class, 'rollback'])->name('deployments.rollback');
 

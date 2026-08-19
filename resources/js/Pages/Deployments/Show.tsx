@@ -15,7 +15,7 @@ import {
   Activity, 
   Download, 
   AlertTriangle,
-  ChevronRight
+  RefreshCw
 } from 'lucide-react';
 
 interface Props {
@@ -24,7 +24,9 @@ interface Props {
 
 export default function DeploymentShow({ deployment }: Props) {
   const [logs, setLogs] = useState<DeploymentLog[]>(deployment.logs || []);
+  const [steps, setSteps] = useState<DeploymentStep[]>(deployment.steps || []);
   const [status, setStatus] = useState(deployment.status);
+  const [duration, setDuration] = useState<number | null>(deployment.duration_seconds || null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll terminal to bottom when new logs arrive
@@ -32,23 +34,30 @@ export default function DeploymentShow({ deployment }: Props) {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Polling / SSE fallback for live log streaming
+  // Fast Real-Time Polling for live logs & step state progression
   useEffect(() => {
-    if (status === 'running' || status === 'validating' || status === 'queued' || status === 'health_check') {
-      const interval = setInterval(() => {
-        router.reload({
-          only: ['deployment'],
-          onSuccess: (page: any) => {
-            if (page.props.deployment) {
-              setLogs(page.props.deployment.logs || []);
-              setStatus(page.props.deployment.status);
-            }
-          },
+    const isLive = ['running', 'validating', 'queued', 'health_check', 'pending'].includes(status);
+    if (!isLive) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/deployments/${deployment.id}/stream`, {
+          headers: { 'Accept': 'application/json' },
         });
-      }, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [status]);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.logs) setLogs(data.logs);
+          if (data.steps) setSteps(data.steps);
+          if (data.status) setStatus(data.status);
+          if (data.duration_seconds !== undefined) setDuration(data.duration_seconds);
+        }
+      } catch (err) {
+        console.error('Failed to stream deployment updates', err);
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [status, deployment.id]);
 
   const handleRollback = () => {
     if (confirm('Are you sure you want to trigger a rollback to the previous stable release?')) {
@@ -65,13 +74,13 @@ export default function DeploymentShow({ deployment }: Props) {
   const getStepIcon = (stepStatus: string) => {
     switch (stepStatus) {
       case 'success':
-        return <CheckCircle2 size={16} className="text-success" />;
+        return <CheckCircle2 size={18} className="text-success flex-shrink-0" />;
       case 'running':
-        return <span className="spinner-border spinner-border-sm text-info" style={{ width: '14px', height: '14px' }}></span>;
+        return <span className="spinner-border spinner-border-sm text-info flex-shrink-0" style={{ width: '16px', height: '16px' }}></span>;
       case 'failed':
-        return <XCircle size={16} className="text-danger" />;
+        return <XCircle size={18} className="text-danger flex-shrink-0" />;
       default:
-        return <Clock size={16} className="text-secondary" />;
+        return <Clock size={18} className="text-secondary flex-shrink-0 opacity-50" />;
     }
   };
 
@@ -93,58 +102,75 @@ export default function DeploymentShow({ deployment }: Props) {
               status === 'failed' ? 'status-offline' :
               status === 'running' ? 'status-running' : 'status-pending'
             }`}>
+              {status === 'running' && <span className="spinner-grow spinner-grow-sm me-1" style={{ width: '8px', height: '8px' }}></span>}
               {status.toUpperCase()}
             </span>
           </div>
           <p className="text-secondary mb-0 small">
-            {deployment.project?.name} • Target Server: <strong className="text-light">{deployment.server?.name}</strong> • Branch: <code>{deployment.branch}</code>
+            {deployment.project?.name} • Target Server: <strong className="text-light">{deployment.server?.name}</strong> • Branch: <code className="text-info">{deployment.branch}</code>
           </p>
         </div>
 
-        {/* Action Toolbar */}
-        <div className="d-flex gap-2">
-          {status === 'failed' && (
-            <>
-              <button className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1" onClick={handleRollback}>
-                <RotateCcw size={16} />
-                <span>Initiate Rollback</span>
-              </button>
-              <button className="btn btn-primary btn-sm d-flex align-items-center gap-1" onClick={handleRetry}>
-                <PlayCircle size={16} />
-                <span>Retry Deployment</span>
-              </button>
-            </>
+        {/* Action Controls */}
+        <div className="d-flex align-items-center gap-2">
+          {status === 'running' && (
+            <div className="text-info small d-flex align-items-center gap-1 me-2 font-monospace">
+              <RefreshCw size={14} className="spin" /> Live Streaming
+            </div>
           )}
-          {status === 'success' && (
-            <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onClick={handleRollback}>
-              <RotateCcw size={16} />
-              <span>Rollback to Previous</span>
+          {status === 'failed' && (
+            <button className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1" onClick={handleRetry}>
+              <PlayCircle size={15} />
+              <span>Retry Deployment</span>
+            </button>
+          )}
+          {['success', 'failed'].includes(status) && (
+            <button className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1" onClick={handleRollback}>
+              <RotateCcw size={15} />
+              <span>Rollback Release</span>
             </button>
           )}
         </div>
       </div>
 
       <div className="row g-4">
-        {/* Left Column: Pipeline Execution Stepper */}
+        {/* Left Column: Stepper & Metadata */}
         <div className="col-12 col-lg-4">
+          {/* Stepper Card */}
           <div className="card bg-dark border-secondary border-opacity-25 shadow-sm mb-4">
-            <div className="card-header d-flex align-items-center gap-2">
-              <Activity size={18} className="text-primary" />
-              <span className="text-light fw-semibold">Execution Pipeline Steps</span>
+            <div className="card-header d-flex align-items-center justify-content-between">
+              <div className="d-flex align-items-center gap-2">
+                <Activity size={18} className="text-primary" />
+                <span className="text-light fw-semibold">Execution Pipeline Steps</span>
+              </div>
+              <span className="badge bg-secondary bg-opacity-25 text-secondary small">
+                {steps.filter(s => s.status === 'success').length}/{steps.length}
+              </span>
             </div>
             <div className="card-body p-0">
               <ul className="list-group list-group-flush bg-transparent">
-                {(deployment.steps && deployment.steps.length > 0) ? (
-                  deployment.steps.map((step, idx) => (
-                    <li key={step.id} className="list-group-item bg-transparent border-secondary border-opacity-25 py-3 d-flex align-items-center justify-content-between">
+                {steps.length > 0 ? (
+                  steps.map((step, idx) => (
+                    <li 
+                      key={step.id} 
+                      className={`list-group-item bg-transparent border-secondary border-opacity-25 py-3 d-flex align-items-center justify-content-between ${
+                        step.status === 'running' ? 'bg-info bg-opacity-10' : ''
+                      }`}
+                    >
                       <div className="d-flex align-items-center gap-3">
                         {getStepIcon(step.status)}
                         <div>
-                          <div className="fw-semibold text-light font-monospace small">
+                          <div className={`fw-semibold font-monospace small ${
+                            step.status === 'running' ? 'text-info fw-bold' :
+                            step.status === 'success' ? 'text-light' :
+                            step.status === 'failed' ? 'text-danger' : 'text-secondary'
+                          }`}>
                             {idx + 1}. {step.action_verb}
                           </div>
                           <div className="text-secondary" style={{ fontSize: '0.7rem' }}>
-                            {step.started_at ? `Started ${step.started_at}` : 'Waiting in queue'}
+                            {step.status === 'running' ? 'Executing on target server...' :
+                             step.status === 'success' ? 'Step completed successfully' :
+                             step.status === 'failed' ? 'Step failed with error' : 'Waiting in queue'}
                           </div>
                         </div>
                       </div>
@@ -172,10 +198,10 @@ export default function DeploymentShow({ deployment }: Props) {
               <span className="text-light fw-semibold">Audit & Governance Details</span>
             </div>
             <div className="card-body text-secondary small">
-              <div className="mb-2"><strong>Commit SHA:</strong> <code>{deployment.commit_sha || 'HEAD'}</code></div>
-              <div className="mb-2"><strong>Trigger Source:</strong> <span className="text-info text-capitalize">{deployment.trigger_source}</span></div>
-              <div className="mb-2"><strong>Initiated By:</strong> {deployment.triggered_by?.name || 'Automated Webhook'}</div>
-              <div className="mb-2"><strong>Duration:</strong> {deployment.duration_seconds ? `${deployment.duration_seconds} seconds` : 'In progress'}</div>
+              <div className="mb-2"><strong>Commit SHA:</strong> <code className="text-info">{deployment.commit_sha || 'HEAD'}</code></div>
+              <div className="mb-2"><strong>Trigger Source:</strong> <span className="text-light text-capitalize">{deployment.trigger_source}</span></div>
+              <div className="mb-2"><strong>Initiated By:</strong> <span className="text-light">{deployment.triggered_by?.name || 'Automated Webhook'}</span></div>
+              <div className="mb-2"><strong>Duration:</strong> <span className="text-light">{duration ? `${duration} seconds` : 'In progress'}</span></div>
               <div><strong>CoreSentinel Gate:</strong> <span className="text-success">Verified Allowlisted Action</span></div>
             </div>
           </div>
@@ -195,25 +221,23 @@ export default function DeploymentShow({ deployment }: Props) {
               </div>
               <div className="d-flex align-items-center gap-2">
                 <span className="text-secondary small d-none d-sm-inline">Sanitized ANSI Stream</span>
-                <button className="btn btn-sm btn-link text-secondary p-0" title="Download Raw Logs">
-                  <Download size={14} />
-                </button>
               </div>
             </div>
-            <div className="terminal-body">
-              <div className="log-system mb-2">
-                [SYSTEM] Connected to CoreSentinel Server Agent Daemon (Protocol v1.1.0)
-              </div>
-              <div className="log-system mb-3">
-                [SYSTEM] Workspace: {deployment.project?.deploy_path || '/var/www'} | Lock acquired: OK
-              </div>
-
+            <div className="terminal-body" style={{ minHeight: '440px', maxHeight: '680px', overflowY: 'auto' }}>
               {logs.length === 0 ? (
-                <div className="text-secondary italic">Waiting for agent to stream execution output...</div>
+                <div className="text-secondary font-monospace small py-4 text-center">
+                  Waiting for agent output stream...
+                </div>
               ) : (
-                logs.map((log) => (
-                  <div key={log.id} className={`log-${log.stream_type} font-monospace mb-1`}>
-                    <span className="text-secondary opacity-50 me-2" style={{ fontSize: '0.75rem' }}>
+                logs.map((log, idx) => (
+                  <div 
+                    key={log.id || idx} 
+                    className={`terminal-line ${
+                      log.stream_type === 'stderr' ? 'text-danger' : 
+                      log.stream_type === 'system' ? 'text-primary' : 'text-light'
+                    }`}
+                  >
+                    <span className="text-secondary select-none opacity-50 me-2" style={{ fontSize: '0.75rem' }}>
                       [{log.stream_type.toUpperCase()}]
                     </span>
                     <span>{log.log_content}</span>
