@@ -18,7 +18,7 @@ class RepositoryController extends Controller
 {
     public function index(): Response
     {
-        $repositories = GitRepository::with(['provider', 'credential'])
+        $repositories = GitRepository::with(['provider', 'credential', 'webhook'])
             ->latest()
             ->get();
 

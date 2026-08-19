@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import { GitRepository, GitProvider } from '@/types';
-import { FolderGit2, Plus, GitBranch, Key, ShieldCheck, Lock, CheckCircle2, ExternalLink } from 'lucide-react';
+import { FolderGit2, Plus, GitBranch, Key, ShieldCheck, Lock, CheckCircle2, ExternalLink, Webhook as WebhookIcon, Copy, Check, Info } from 'lucide-react';
 
 interface Props {
   repositories: GitRepository[];
@@ -11,6 +11,8 @@ interface Props {
 
 export default function RepositoriesIndex({ repositories = [], providers = [] }: Props) {
   const [showModal, setShowModal] = useState(false);
+  const [webhookModalRepo, setWebhookModalRepo] = useState<GitRepository | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const { data, setData, post, processing, errors, reset } = useForm({
     name: '',
@@ -30,6 +32,18 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
         setShowModal(false);
       },
     });
+  };
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const getWebhookUrl = (repo: GitRepository) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+    const provider = repo.provider?.provider_type || 'github';
+    return `${origin}/api/v1/webhooks/${provider}`;
   };
 
   return (
@@ -59,8 +73,8 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
                 <th>REPOSITORY NAME</th>
                 <th>PROVIDER & URL</th>
                 <th>DEFAULT BRANCH</th>
-                <th>AUTH METHOD</th>
-                <th>WEBHOOK STATUS</th>
+                <th>AUTH ENCRYPTION</th>
+                <th>STATUS</th>
                 <th className="text-end">ACTIONS</th>
               </tr>
             </thead>
@@ -68,35 +82,45 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
               {repositories.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5 text-secondary">
-                    <FolderGit2 size={40} className="mb-2 opacity-50" />
-                    <div className="fw-semibold">No repositories registered</div>
-                    <div className="small">Add a GitHub or GitLab repository to configure deployment pipelines.</div>
+                    <FolderGit2 size={36} className="mb-2 opacity-50" />
+                    <div>No Git repositories connected yet.</div>
+                    <button className="btn btn-outline-primary btn-sm mt-3" onClick={() => setShowModal(true)}>
+                      Connect First Repository
+                    </button>
                   </td>
                 </tr>
               ) : (
                 repositories.map((repo) => (
-                  <tr key={repo.id} className="border-secondary border-opacity-25">
+                  <tr key={repo.id}>
                     <td>
-                      <div className="fw-bold text-light">{repo.name}</div>
-                      <div className="text-secondary small">{repo.owner_org}</div>
-                    </td>
-                    <td>
-                      <div className="d-flex align-items-center gap-1 text-info small">
-                        <span>{repo.repo_url}</span>
+                      <div className="d-flex align-items-center gap-2">
+                        <FolderGit2 size={18} className="text-primary" />
+                        <div>
+                          <div className="fw-semibold text-light">{repo.name}</div>
+                          {repo.owner_org && <span className="badge bg-secondary text-dark small">{repo.owner_org}</span>}
+                        </div>
                       </div>
-                      <span className="badge bg-secondary-subtle text-secondary" style={{ fontSize: '0.65rem' }}>
-                        {repo.provider?.name || 'GitHub'}
+                    </td>
+                    <td>
+                      <div className="text-light small">{repo.provider?.name || 'Git'}</div>
+                      <a
+                        href={repo.repo_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-secondary small text-decoration-none font-monospace text-truncate d-inline-block"
+                        style={{ maxWidth: '280px' }}
+                      >
+                        {repo.repo_url} <ExternalLink size={12} className="ms-1" />
+                      </a>
+                    </td>
+                    <td>
+                      <span className="badge bg-dark border border-secondary text-info font-monospace">
+                        <GitBranch size={12} className="me-1" /> {repo.default_branch}
                       </span>
                     </td>
                     <td>
-                      <span className="badge bg-dark border border-secondary text-info d-inline-flex align-items-center gap-1">
-                        <GitBranch size={12} />
-                        {repo.default_branch}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="badge bg-info-subtle text-info text-uppercase" style={{ fontSize: '0.7rem' }}>
-                        {repo.auth_type} (Encrypted)
+                      <span className="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">
+                        <ShieldCheck size={12} className="me-1" /> AES-256 Encrypted
                       </span>
                     </td>
                     <td>
@@ -105,8 +129,13 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
                       </span>
                     </td>
                     <td className="text-end">
-                      <button className="btn btn-outline-secondary btn-sm" style={{ fontSize: '0.75rem' }}>
-                        Configure Webhook
+                      <button
+                        className="btn btn-outline-info btn-sm d-inline-flex align-items-center gap-1"
+                        style={{ fontSize: '0.75rem' }}
+                        onClick={() => setWebhookModalRepo(repo)}
+                      >
+                        <WebhookIcon size={13} />
+                        <span>Configure Webhook</span>
                       </button>
                     </td>
                   </tr>
@@ -116,6 +145,119 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
           </table>
         </div>
       </div>
+
+      {/* Webhook Configuration Modal */}
+      {webhookModalRepo && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content bg-dark border-secondary border-opacity-50 text-light shadow-lg">
+              <div className="modal-header border-secondary border-opacity-25">
+                <h5 className="modal-title fw-bold d-flex align-items-center gap-2">
+                  <WebhookIcon size={20} className="text-info" />
+                  <span>Webhook Setup: {webhookModalRepo.name}</span>
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setWebhookModalRepo(null)}></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-secondary small mb-4">
+                  Add this webhook to your Git provider (<span className="text-light">{webhookModalRepo.provider?.name || 'GitHub'}</span>) to automatically trigger deployments whenever new commits are pushed to bound branches.
+                </p>
+
+                {/* Payload URL */}
+                <div className="mb-3">
+                  <label className="form-label small text-secondary fw-semibold">1. PAYLOAD URL</label>
+                  <div className="input-group">
+                    <input
+                      type="text"
+                      readOnly
+                      className="form-control bg-body-tertiary text-info font-monospace border-secondary border-opacity-50 small"
+                      value={getWebhookUrl(webhookModalRepo)}
+                    />
+                    <button
+                      className="btn btn-outline-secondary d-flex align-items-center gap-1"
+                      onClick={() => copyToClipboard(getWebhookUrl(webhookModalRepo), 'url')}
+                    >
+                      {copiedField === 'url' ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+                      <span>{copiedField === 'url' ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content Type */}
+                <div className="row g-3 mb-3">
+                  <div className="col-md-6">
+                    <label className="form-label small text-secondary fw-semibold">2. CONTENT TYPE</label>
+                    <div className="input-group">
+                      <input
+                        type="text"
+                        readOnly
+                        className="form-control bg-body-tertiary text-light font-monospace border-secondary border-opacity-50 small"
+                        value="application/json"
+                      />
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={() => copyToClipboard('application/json', 'content_type')}
+                      >
+                        {copiedField === 'content_type' ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label small text-secondary fw-semibold">3. TRIGGER EVENTS</label>
+                    <input
+                      type="text"
+                      readOnly
+                      className="form-control bg-body-tertiary text-light border-secondary border-opacity-50 small"
+                      value="Just the 'push' event"
+                    />
+                  </div>
+                </div>
+
+                {/* Webhook Secret */}
+                <div className="mb-4">
+                  <label className="form-label small text-secondary fw-semibold">4. SECRET TOKEN (HMAC-SHA256)</label>
+                  <div className="input-group">
+                    <input
+                      type="text"
+                      readOnly
+                      className="form-control bg-body-tertiary text-warning font-monospace border-secondary border-opacity-50 small"
+                      value={webhookModalRepo.webhook?.uuid || 'cs_webhook_secret_key'}
+                    />
+                    <button
+                      className="btn btn-outline-secondary d-flex align-items-center gap-1"
+                      onClick={() => copyToClipboard(webhookModalRepo.webhook?.uuid || 'cs_webhook_secret_key', 'secret')}
+                    >
+                      {copiedField === 'secret' ? <Check size={16} className="text-success" /> : <Copy size={16} />}
+                      <span>{copiedField === 'secret' ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <div className="text-secondary small mt-1">Used to verify payload authenticity using HMAC-SHA256 signatures.</div>
+                </div>
+
+                {/* Instructions Box */}
+                <div className="bg-body-tertiary p-3 rounded border border-secondary border-opacity-25">
+                  <h6 className="text-light fw-bold small d-flex align-items-center gap-2 mb-2">
+                    <Info size={16} className="text-primary" /> Setup Instructions for GitHub / GitLab
+                  </h6>
+                  <ol className="text-secondary small mb-0 ps-3">
+                    <li className="mb-1">Go to your repository on <strong>GitHub / GitLab</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Webhooks</strong>.</li>
+                    <li className="mb-1">Click <strong>Add webhook</strong>.</li>
+                    <li className="mb-1">Paste the <strong>Payload URL</strong> and <strong>Secret Token</strong> above.</li>
+                    <li className="mb-1">Set <strong>Content type</strong> to <code>application/json</code>.</li>
+                    <li>Click <strong>Add webhook</strong> to activate auto-deploy on push!</li>
+                  </ol>
+                </div>
+              </div>
+              <div className="modal-footer border-secondary border-opacity-25">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setWebhookModalRepo(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Connect Repository Modal */}
       {showModal && (
@@ -180,16 +322,17 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label small text-secondary">
-                      Access Token / Secret Key (Stored Encrypted with AES-256-GCM)
-                    </label>
-                    <input
-                      type="password"
-                      className="form-control bg-dark text-light border-secondary border-opacity-50"
-                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    <label className="form-label small text-secondary">Personal Access Token / Private Key</label>
+                    <textarea
+                      className="form-control bg-dark text-light border-secondary border-opacity-50 font-monospace small"
+                      rows={3}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx or -----BEGIN OPENSSH PRIVATE KEY-----"
                       value={data.credential_token}
                       onChange={(e) => setData('credential_token', e.target.value)}
-                    />
+                    ></textarea>
+                    <div className="text-secondary small mt-1">
+                      <Lock size={12} className="me-1" /> Encrypted with AES-256-GCM before storage.
+                    </div>
                   </div>
                 </div>
                 <div className="modal-footer border-secondary border-opacity-25">
@@ -197,7 +340,7 @@ export default function RepositoriesIndex({ repositories = [], providers = [] }:
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary btn-sm" disabled={processing}>
-                    {processing ? 'Saving...' : 'Save & Encrypt Repository'}
+                    {processing ? 'Encrypting & Saving...' : 'Save Repository'}
                   </button>
                 </div>
               </form>
